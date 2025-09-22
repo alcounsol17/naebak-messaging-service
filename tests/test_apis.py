@@ -14,8 +14,13 @@ from messages.models import UserProfile, Conversation, Message, MessageReport, S
 class TestUserProfileAPI:
     """اختبارات API ملفات المستخدمين"""
     
-    def test_create_profile(self, authenticated_client, citizen_user):
+    def test_create_profile(self, api_client, user):
         """اختبار إنشاء ملف مستخدم"""
+        # إعداد المصادقة للمستخدم الذي لا يملك ملف
+        from rest_framework_simplejwt.tokens import RefreshToken
+        refresh = RefreshToken.for_user(user)
+        api_client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+        
         url = reverse('userprofile-create-profile')
         data = {
             'user_type': 'citizen',
@@ -24,18 +29,17 @@ class TestUserProfileAPI:
             'district': 'مصر الجديدة'
         }
         
-        response = authenticated_client.post(url, data)
+        response = api_client.post(url, data)
         
         assert response.status_code == status.HTTP_201_CREATED
-        assert UserProfile.objects.filter(user=citizen_user).exists()
+        assert UserProfile.objects.filter(user=user).exists()
     
     def test_get_my_profile(self, authenticated_client, citizen_user):
         """اختبار الحصول على ملف المستخدم الحالي"""
-        profile = UserProfile.objects.create(
-            user=citizen_user,
-            user_type='citizen',
-            phone='01234567890'
-        )
+        # استخدام الملف الموجود من fixture
+        profile = citizen_user.userprofile
+        profile.phone = '01234567890'
+        profile.save()
         
         url = reverse('userprofile-me')
         response = authenticated_client.get(url)
@@ -44,10 +48,15 @@ class TestUserProfileAPI:
         assert response.data['user_type'] == 'citizen'
         assert response.data['phone'] == '01234567890'
     
-    def test_get_profile_not_found(self, authenticated_client):
+    def test_get_profile_not_found(self, api_client, user):
         """اختبار عدم وجود ملف المستخدم"""
+        # إعداد المصادقة للمستخدم الذي لا يملك ملف
+        from rest_framework_simplejwt.tokens import RefreshToken
+        refresh = RefreshToken.for_user(user)
+        api_client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+        
         url = reverse('userprofile-me')
-        response = authenticated_client.get(url)
+        response = api_client.get(url)
         
         assert response.status_code == status.HTTP_404_NOT_FOUND
     
@@ -67,8 +76,9 @@ class TestConversationAPI:
         """اختبار إنشاء محادثة جديدة"""
         url = reverse('conversation-list')
         data = {
-            'representative': representative_user.id,
-            'subject': 'استفسار عن الخدمات'
+            'representative_id': representative_user.id,
+            'subject': 'استفسار عن الخدمات',
+            'first_message': 'مرحباً، أريد الاستفسار عن الخدمات المتاحة'
         }
         
         response = authenticated_client.post(url, data)
@@ -92,8 +102,9 @@ class TestConversationAPI:
         response = authenticated_client.get(url)
         
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data) == 1
-        assert response.data[0]['subject'] == 'محادثة تجريبية'
+        assert response.data['count'] == 1
+        assert len(response.data['results']) == 1
+        assert response.data['results'][0]['subject'] == 'محادثة تجريبية'
     
     def test_close_conversation(self, authenticated_client, citizen_user, representative_user):
         """اختبار إغلاق محادثة"""
@@ -353,8 +364,9 @@ class TestMessageReportAPI:
         response = authenticated_client.get(url)
         
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data) == 1
-        assert response.data[0]['reason'] == 'spam'
+        assert response.data['count'] == 1
+        assert len(response.data['results']) == 1
+        assert response.data['results'][0]['reason'] == 'spam'
 
 
 @pytest.mark.django_db
@@ -374,8 +386,9 @@ class TestSystemNotificationAPI:
         response = authenticated_client.get(url)
         
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data) == 1
-        assert response.data[0]['title'] == 'رسالة جديدة'
+        assert response.data['count'] == 1
+        assert len(response.data['results']) == 1
+        assert response.data['results'][0]['title'] == 'رسالة جديدة'
     
     def test_mark_notification_as_read(self, authenticated_client, citizen_user):
         """اختبار تحديد إشعار كمقروء"""

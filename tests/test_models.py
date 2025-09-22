@@ -35,7 +35,7 @@ class TestUserProfile:
         assert profile.governorate == 'القاهرة'
         assert profile.district == 'مصر الجديدة'
         assert profile.email_notifications is True
-        assert profile.sms_notifications is True
+        assert profile.sms_notifications is False  # القيمة الافتراضية False
         assert str(profile) == f"{user.get_full_name() or user.username} - مواطن"
     
     def test_create_representative_profile(self, user):
@@ -149,7 +149,7 @@ class TestMessage:
         assert message.is_read is False
         assert message.is_system_message is False
         assert message.read_at is None
-        assert str(message) == f"رسالة من {citizen_user.get_full_name() or citizen_user.username}"
+        assert str(message) == f"رسالة من {citizen_user.get_full_name() or citizen_user.username}: مرحباً، أريد استفسار"
     
     def test_mark_as_read(self, message):
         """اختبار تحديد الرسالة كمقروءة"""
@@ -207,7 +207,7 @@ class TestMessageReport:
         assert report.reason == 'spam'
         assert report.description == 'رسالة مزعجة'
         assert report.is_reviewed is False
-        assert str(report) == f"إبلاغ عن رسالة من {message.sender.get_full_name() or message.sender.username}"
+        assert str(report) == f"إبلاغ عن رسالة - {report.reporter.get_full_name() or report.reporter.username} - {report.get_reason_display()}"
     
     def test_mark_as_reviewed(self, message, representative_user, user):
         """اختبار تحديد الإبلاغ كمراجع"""

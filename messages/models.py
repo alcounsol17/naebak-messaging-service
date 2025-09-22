@@ -60,6 +60,18 @@ class UserProfile(BaseModel):
             models.Index(fields=['representative_id']),
         ]
 
+    def clean(self):
+        """التحقق من صحة البيانات"""
+        super().clean()
+        if self.phone:
+            # التحقق من رقم الهاتف باستخدام الـ validator
+            from django.core.validators import RegexValidator
+            validator = RegexValidator(
+                regex=r'^\d{10,15}$',
+                message='رقم الهاتف يجب أن يكون بين 10 و 15 رقم'
+            )
+            validator(self.phone)
+
     def __str__(self):
         return f"{self.user.get_full_name() or self.user.username} - {self.get_user_type_display()}"
 
@@ -131,8 +143,8 @@ class Conversation(BaseModel):
         ordering = ['-last_message_at', '-created_at']
 
     def __str__(self):
-        if len(self.subject) > 30:
-            return f"{self.subject[:30]}..."
+        if len(self.subject) > 50:
+            return f"{self.subject[:50]}..."
         return self.subject
 
     def save(self, *args, **kwargs):
@@ -141,11 +153,11 @@ class Conversation(BaseModel):
             self.last_message_at = timezone.now()
         super().save(*args, **kwargs)
     
-    def close(self, closed_by_user):
+    def close(self, closed_by):
         """إغلاق المحادثة"""
         self.is_closed = True
         self.closed_at = timezone.now()
-        self.closed_by = closed_by_user
+        self.closed_by = closed_by
         self.save()
     
     def update_last_message(self, message):
@@ -315,11 +327,11 @@ class MessageReport(BaseModel):
         reporter_name = self.reporter.get_full_name() or self.reporter.username
         return f"إبلاغ عن رسالة - {reporter_name} - {self.get_reason_display()}"
     
-    def mark_as_reviewed(self, reviewed_by_user, action_taken=""):
+    def mark_as_reviewed(self, reviewed_by, action_taken=''):
         """تمييز الإبلاغ كمراجع"""
         self.is_reviewed = True
         self.reviewed_at = timezone.now()
-        self.reviewed_by = reviewed_by_user
+        self.reviewed_by = reviewed_by
         self.action_taken = action_taken
         self.save()
 

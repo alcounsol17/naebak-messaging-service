@@ -222,6 +222,21 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
         except UserProfile.DoesNotExist:
             raise serializers.ValidationError("ملف النائب غير موجود")
     
+    def validate(self, data):
+        """التحقق من صحة البيانات العامة"""
+        request = self.context.get('request')
+        if request and request.user:
+            citizen = request.user
+            representative_id = data.get('representative_id')
+            
+            # التحقق من عدم إنشاء محادثة مع نفس المستخدم
+            if citizen.id == representative_id:
+                raise serializers.ValidationError({
+                    'non_field_errors': ['لا يمكن إنشاء محادثة مع نفسك']
+                })
+        
+        return data
+    
     def validate_first_message(self, value):
         """التحقق من الرسالة الأولى"""
         if len(value.strip()) == 0:
@@ -291,14 +306,15 @@ class MessageStatisticsSerializer(serializers.ModelSerializer):
 
 class SystemNotificationSerializer(serializers.ModelSerializer):
     """Serializer لإشعارات النظام"""
+    user = UserSerializer(read_only=True)
     
     class Meta:
         model = SystemNotification
         fields = [
-            'id', 'notification_type', 'title', 'message', 'related_object_id',
+            'id', 'user', 'notification_type', 'title', 'message', 'related_object_id',
             'action_url', 'is_read', 'read_at', 'created_at'
         ]
-        read_only_fields = ['id', 'is_read', 'read_at', 'created_at']
+        read_only_fields = ['id', 'user', 'is_read', 'read_at', 'created_at']
 
 
 class ConversationDetailSerializer(ConversationSerializer):

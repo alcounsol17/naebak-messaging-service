@@ -53,8 +53,9 @@ SECRET_KEY = 'test-secret-key-for-testing-only'
 DEBUG = True
 ALLOWED_HOSTS = ['*']
 
-# تعطيل CSRF للاختبارات API
+# إعدادات المصادقة للاختبارات API
 REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES'] = [
+    'rest_framework_simplejwt.authentication.JWTAuthentication',
     'rest_framework.authentication.SessionAuthentication',
 ]
 

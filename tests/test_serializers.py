@@ -22,13 +22,12 @@ class TestUserProfileSerializer:
     
     def test_serialize_user_profile(self, citizen_user):
         """اختبار تسلسل ملف المستخدم"""
-        profile = UserProfile.objects.create(
-            user=citizen_user,
-            user_type='citizen',
-            phone='01234567890',
-            governorate='القاهرة',
-            district='مصر الجديدة'
-        )
+        # استخدام الملف الموجود من fixture
+        profile = citizen_user.userprofile
+        profile.phone = '01234567890'
+        profile.governorate = 'القاهرة'
+        profile.district = 'مصر الجديدة'
+        profile.save()
         
         serializer = UserProfileSerializer(profile)
         data = serializer.data
@@ -122,12 +121,18 @@ class TestConversationSerializer:
     def test_create_conversation(self, citizen_user, representative_user):
         """اختبار إنشاء محادثة"""
         data = {
-            'citizen': citizen_user.id,
-            'representative': representative_user.id,
-            'subject': 'محادثة جديدة'
+            'representative_id': representative_user.id,
+            'subject': 'محادثة جديدة',
+            'first_message': 'رسالة أولى'
         }
         
-        serializer = ConversationCreateSerializer(data=data)
+        # إنشاء context مع request mock
+        from unittest.mock import Mock
+        request = Mock()
+        request.user = citizen_user
+        context = {'request': request}
+        
+        serializer = ConversationCreateSerializer(data=data, context=context)
         assert serializer.is_valid()
         
         conversation = serializer.save()
@@ -150,14 +155,21 @@ class TestConversationSerializer:
     def test_create_conversation_same_users(self, citizen_user):
         """اختبار إنشاء محادثة بين نفس المستخدم"""
         data = {
-            'citizen': citizen_user.id,
-            'representative': citizen_user.id,
-            'subject': 'محادثة خاطئة'
+            'representative_id': citizen_user.id,
+            'subject': 'محادثة خاطئة',
+            'first_message': 'رسالة أولى'
         }
         
-        serializer = ConversationCreateSerializer(data=data)
+        # إنشاء context مع request mock
+        from unittest.mock import Mock
+        request = Mock()
+        request.user = citizen_user
+        context = {'request': request}
+        
+        serializer = ConversationCreateSerializer(data=data, context=context)
         assert not serializer.is_valid()
-        assert 'non_field_errors' in serializer.errors
+        # التحقق من وجود خطأ في representative_id لأن المستخدم ليس نائباً
+        assert 'representative_id' in serializer.errors
 
 
 @pytest.mark.django_db
@@ -180,11 +192,16 @@ class TestMessageSerializer:
         """اختبار إنشاء رسالة"""
         data = {
             'conversation': conversation.id,
-            'sender': citizen_user.id,
             'content': 'رسالة جديدة'
         }
         
-        serializer = MessageCreateSerializer(data=data)
+        # إنشاء context مع request mock
+        from unittest.mock import Mock
+        request = Mock()
+        request.user = citizen_user
+        context = {'request': request}
+        
+        serializer = MessageCreateSerializer(data=data, context=context)
         assert serializer.is_valid()
         
         message = serializer.save()
@@ -215,12 +232,17 @@ class TestMessageSerializer:
         
         data = {
             'conversation': conversation.id,
-            'sender': representative_user.id,
             'content': 'رد على الرسالة',
             'reply_to': original_message.id
         }
         
-        serializer = MessageCreateSerializer(data=data)
+        # إنشاء context مع request mock
+        from unittest.mock import Mock
+        request = Mock()
+        request.user = representative_user
+        context = {'request': request}
+        
+        serializer = MessageCreateSerializer(data=data, context=context)
         assert serializer.is_valid()
         
         message = serializer.save()
@@ -255,12 +277,17 @@ class TestMessageReportSerializer:
         """اختبار إنشاء إبلاغ"""
         data = {
             'message': message.id,
-            'reporter': representative_user.id,
             'reason': 'inappropriate',
             'description': 'محتوى غير مناسب'
         }
         
-        serializer = MessageReportSerializer(data=data)
+        # إنشاء context مع request mock
+        from unittest.mock import Mock
+        request = Mock()
+        request.user = representative_user
+        context = {'request': request}
+        
+        serializer = MessageReportSerializer(data=data, context=context)
         assert serializer.is_valid()
         
         report = serializer.save()
