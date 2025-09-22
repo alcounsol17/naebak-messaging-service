@@ -1,0 +1,614 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}لوحة تحكم النائب - خدمة الرسائل{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Sidebar -->
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-user-tie"></i> لوحة تحكم النائب</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    <a href="#inbox" class="list-group-item list-group-item-action active" data-tab="inbox">
+                        <i class="fas fa-inbox"></i>
+                        صندوق الوارد
+                        <span class="badge unread-badge float-end">{{ unread_conversations }}</span>
+                    </a>
+                    <a href="#conversations" class="list-group-item list-group-item-action" data-tab="conversations">
+                        <i class="fas fa-comments"></i>
+                        جميع المحادثات
+                    </a>
+                    <a href="#reports" class="list-group-item list-group-item-action" data-tab="reports">
+                        <i class="fas fa-flag"></i>
+                        البلاغات
+                        <span class="badge bg-danger float-end">{{ pending_reports }}</span>
+                    </a>
+                    <a href="#statistics" class="list-group-item list-group-item-action" data-tab="statistics">
+                        <i class="fas fa-chart-bar"></i>
+                        الإحصائيات
+                    </a>
+                    <a href="#settings" class="list-group-item list-group-item-action" data-tab="settings">
+                        <i class="fas fa-cog"></i>
+                        الإعدادات
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Stats -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6><i class="fas fa-tachometer-alt"></i> إحصائيات سريعة</h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <h4 class="text-primary">{{ total_conversations }}</h4>
+                        <small>إجمالي المحادثات</small>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-success">{{ response_rate }}%</h4>
+                        <small>معدل الرد</small>
+                    </div>
+                </div>
+                <hr>
+                <div class="row text-center">
+                    <div class="col-6">
+                        <h4 class="text-warning">{{ avg_response_time }}</h4>
+                        <small>متوسط وقت الرد</small>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-info">{{ satisfaction_rate }}%</h4>
+                        <small>معدل الرضا</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="col-md-9">
+        <!-- Inbox Tab -->
+        <div id="inbox-tab" class="tab-content active">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-inbox"></i> صندوق الوارد</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary" id="mark-all-conversations-read">
+                            <i class="fas fa-check-double"></i>
+                            تحديد الكل كمقروء
+                        </button>
+                        <div class="btn-group" role="group">
+                            <input type="radio" class="btn-check" name="filter" id="all" value="all" checked>
+                            <label class="btn btn-outline-secondary btn-sm" for="all">الكل</label>
+                            
+                            <input type="radio" class="btn-check" name="filter" id="unread" value="unread">
+                            <label class="btn btn-outline-warning btn-sm" for="unread">غير مقروءة</label>
+                            
+                            <input type="radio" class="btn-check" name="filter" id="urgent" value="urgent">
+                            <label class="btn btn-outline-danger btn-sm" for="urgent">عاجل</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if conversations %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>المواطن</th>
+                                        <th>الموضوع</th>
+                                        <th>آخر رسالة</th>
+                                        <th>التاريخ</th>
+                                        <th>الحالة</th>
+                                        <th>الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for conversation in conversations %}
+                                        <tr class="{% if conversation.unread_count > 0 %}table-warning{% endif %}"
+                                            data-conversation-id="{{ conversation.id }}">
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="avatar-sm me-2">
+                                                        {% if conversation.citizen_profile.avatar %}
+                                                            <img src="{{ conversation.citizen_profile.avatar.url }}" 
+                                                                 class="rounded-circle" width="32" height="32">
+                                                        {% else %}
+                                                            <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center" 
+                                                                 style="width: 32px; height: 32px;">
+                                                                <i class="fas fa-user text-white"></i>
+                                                            </div>
+                                                        {% endif %}
+                                                    </div>
+                                                    <div>
+                                                        <strong>{{ conversation.citizen.get_full_name }}</strong>
+                                                        {% if conversation.citizen_profile.governorate %}
+                                                            <br><small class="text-muted">{{ conversation.citizen_profile.governorate }}</small>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <strong>{{ conversation.subject }}</strong>
+                                                {% if conversation.unread_count > 0 %}
+                                                    <span class="badge unread-badge">{{ conversation.unread_count }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if conversation.last_message %}
+                                                    <div class="text-truncate" style="max-width: 200px;">
+                                                        {{ conversation.last_message.content }}
+                                                    </div>
+                                                {% else %}
+                                                    <em class="text-muted">لا توجد رسائل</em>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if conversation.last_message_at %}
+                                                    <small>{{ conversation.last_message_at|timesince }} مضت</small>
+                                                {% else %}
+                                                    <small>{{ conversation.created_at|timesince }} مضت</small>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if conversation.is_closed %}
+                                                    <span class="badge bg-secondary">مغلقة</span>
+                                                {% else %}
+                                                    <span class="badge bg-success">نشطة</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-primary open-conversation" 
+                                                            data-conversation-id="{{ conversation.id }}">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                    {% if not conversation.is_closed %}
+                                                        <button class="btn btn-outline-warning close-conversation" 
+                                                                data-conversation-id="{{ conversation.id }}">
+                                                            <i class="fas fa-times"></i>
+                                                        </button>
+                                                    {% endif %}
+                                                    <div class="btn-group" role="group">
+                                                        <button class="btn btn-outline-secondary dropdown-toggle" 
+                                                                data-bs-toggle="dropdown">
+                                                            <i class="fas fa-ellipsis-v"></i>
+                                                        </button>
+                                                        <ul class="dropdown-menu">
+                                                            <li><a class="dropdown-item mark-important" 
+                                                                   data-conversation-id="{{ conversation.id }}">
+                                                                <i class="fas fa-star"></i> تحديد كمهم
+                                                            </a></li>
+                                                            <li><a class="dropdown-item archive-conversation" 
+                                                                   data-conversation-id="{{ conversation.id }}">
+                                                                <i class="fas fa-archive"></i> أرشفة
+                                                            </a></li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Pagination -->
+                        {% if is_paginated %}
+                            <nav aria-label="Page navigation">
+                                <ul class="pagination justify-content-center">
+                                    {% if page_obj.has_previous %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page=1">الأولى</a>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">السابقة</a>
+                                        </li>
+                                    {% endif %}
+                                    
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page_obj.number }} من {{ page_obj.paginator.num_pages }}</span>
+                                    </li>
+                                    
+                                    {% if page_obj.has_next %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ page_obj.next_page_number }}">التالية</a>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">الأخيرة</a>
+                                        </li>
+                                    {% endif %}
+                                </ul>
+                            </nav>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">صندوق الوارد فارغ</h5>
+                            <p class="text-muted">لا توجد محادثات جديدة</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Tab -->
+        <div id="statistics-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-bar"></i> إحصائيات مفصلة</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h3 class="text-primary">{{ stats.total_conversations }}</h3>
+                                    <p>إجمالي المحادثات</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h3 class="text-success">{{ stats.active_conversations }}</h3>
+                                    <p>المحادثات النشطة</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h4 class="text-info">{{ stats.conversations_today }}</h4>
+                                    <p>محادثات اليوم</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h4 class="text-warning">{{ stats.conversations_this_week }}</h4>
+                                    <p>محادثات هذا الأسبوع</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h4 class="text-danger">{{ stats.conversations_this_month }}</h4>
+                                    <p>محادثات هذا الشهر</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h4 class="text-secondary">{{ stats.avg_messages_per_conversation }}</h4>
+                                    <p>متوسط الرسائل لكل محادثة</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h4 class="text-dark">{{ stats.avg_conversation_duration }} يوم</h4>
+                                    <p>متوسط مدة المحادثة</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Tab -->
+        <div id="reports-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-flag"></i> البلاغات المرسلة</h5>
+                </div>
+                <div class="card-body">
+                    {% if reports %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>المواطن</th>
+                                        <th>الرسالة المبلغ عنها</th>
+                                        <th>السبب</th>
+                                        <th>التاريخ</th>
+                                        <th>الحالة</th>
+                                        <th>الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for report in reports %}
+                                        <tr>
+                                            <td>{{ report.message.sender.get_full_name }}</td>
+                                            <td>
+                                                <div class="text-truncate" style="max-width: 200px;">
+                                                    {{ report.message.content }}
+                                                </div>
+                                            </td>
+                                            <td>{{ report.get_reason_display }}</td>
+                                            <td>{{ report.created_at|date:"Y-m-d H:i" }}</td>
+                                            <td>
+                                                {% if report.is_reviewed %}
+                                                    <span class="badge bg-success">تمت المراجعة</span>
+                                                {% else %}
+                                                    <span class="badge bg-warning">قيد المراجعة</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary view-report" 
+                                                        data-report-id="{{ report.id }}">
+                                                    <i class="fas fa-eye"></i>
+                                                    عرض
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-flag fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">لا توجد بلاغات</h5>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-cog"></i> إعدادات الحساب</h5>
+                </div>
+                <div class="card-body">
+                    <form id="rep-settings-form">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="phone" class="form-label">رقم الهاتف</label>
+                                    <input type="tel" class="form-control" id="phone" name="phone" 
+                                           value="{{ user.userprofile.phone }}" pattern="[0-9]{10,15}">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="district" class="form-label">الدائرة الانتخابية</label>
+                                    <input type="text" class="form-control" id="district" name="district" 
+                                           value="{{ user.userprofile.district }}">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="governorate" class="form-label">المحافظة</label>
+                                    <select class="form-select" id="governorate" name="governorate">
+                                        <option value="">-- اختر المحافظة --</option>
+                                        {% for gov in governorates %}
+                                            <option value="{{ gov }}" {% if gov == user.userprofile.governorate %}selected{% endif %}>
+                                                {{ gov }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="avatar" class="form-label">الصورة الشخصية</label>
+                                    <input type="file" class="form-control" id="avatar" name="avatar" accept="image/*">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <h6>إعدادات الإشعارات</h6>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="email-notifications" 
+                                       name="email_notifications" {% if user.userprofile.email_notifications %}checked{% endif %}>
+                                <label class="form-check-label" for="email-notifications">
+                                    إشعارات البريد الإلكتروني
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="sms-notifications" 
+                                       name="sms_notifications" {% if user.userprofile.sms_notifications %}checked{% endif %}>
+                                <label class="form-check-label" for="sms-notifications">
+                                    إشعارات الرسائل النصية
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i>
+                            حفظ الإعدادات
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Conversation Modal (same as citizen) -->
+<div class="modal fade" id="conversationModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="conversationModalLabel">المحادثة</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="messages-container" style="height: 400px; overflow-y: auto;">
+                    <!-- Messages will be loaded here -->
+                </div>
+                
+                <div class="mt-3">
+                    <form id="send-message-form">
+                        {% csrf_token %}
+                        <input type="hidden" id="conversation-id" name="conversation_id">
+                        <div class="input-group">
+                            <textarea class="form-control" id="message-content" name="content" 
+                                      rows="2" maxlength="500" placeholder="اكتب ردك هنا..."></textarea>
+                            <button class="btn btn-primary" type="submit">
+                                <i class="fas fa-paper-plane"></i>
+                                إرسال
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            <span id="message-char-count">0</span> / 500 حرف
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Tab switching (same as citizen)
+    document.querySelectorAll('[data-tab]').forEach(function(tab) {
+        tab.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetTab = this.getAttribute('data-tab');
+            
+            document.querySelectorAll('.tab-content').forEach(function(content) {
+                content.classList.remove('active');
+            });
+            
+            document.getElementById(targetTab + '-tab').classList.add('active');
+            
+            document.querySelectorAll('[data-tab]').forEach(function(t) {
+                t.classList.remove('active');
+            });
+            this.classList.add('active');
+        });
+    });
+    
+    // Character counter for message
+    const messageTextarea = document.getElementById('message-content');
+    const messageCharCount = document.getElementById('message-char-count');
+    
+    if (messageTextarea && messageCharCount) {
+        messageTextarea.addEventListener('input', function() {
+            messageCharCount.textContent = this.value.length;
+        });
+    }
+    
+    // Open conversation
+    document.querySelectorAll('.open-conversation').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const conversationId = this.getAttribute('data-conversation-id');
+            loadConversation(conversationId);
+        });
+    });
+    
+    // Close conversation
+    document.querySelectorAll('.close-conversation').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const conversationId = this.getAttribute('data-conversation-id');
+            if (confirm('هل أنت متأكد من إغلاق هذه المحادثة؟')) {
+                closeConversation(conversationId);
+            }
+        });
+    });
+    
+    // Load conversation function
+    function loadConversation(conversationId) {
+        fetch(`/api/conversations/${conversationId}/`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('conversationModalLabel').textContent = data.subject;
+                document.getElementById('conversation-id').value = conversationId;
+                
+                const messagesContainer = document.getElementById('messages-container');
+                messagesContainer.innerHTML = '';
+                
+                data.messages.forEach(function(message) {
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = `message-bubble ${message.is_from_citizen ? 'message-received' : 'message-sent'}`;
+                    messageDiv.innerHTML = `
+                        <div>${message.content}</div>
+                        <small class="text-muted">${new Date(message.created_at).toLocaleString('ar-EG')}</small>
+                    `;
+                    messagesContainer.appendChild(messageDiv);
+                });
+                
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                
+                const modal = new bootstrap.Modal(document.getElementById('conversationModal'));
+                modal.show();
+            })
+            .catch(error => console.error('Error:', error));
+    }
+    
+    // Close conversation function
+    function closeConversation(conversationId) {
+        fetch(`/api/conversations/${conversationId}/close/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+    
+    // Send message (same as citizen)
+    const sendMessageForm = document.getElementById('send-message-form');
+    if (sendMessageForm) {
+        sendMessageForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const conversationId = document.getElementById('conversation-id').value;
+            
+            fetch(`/api/conversations/${conversationId}/messages/`, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.id) {
+                    loadConversation(conversationId);
+                    document.getElementById('message-content').value = '';
+                    messageCharCount.textContent = '0';
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    }
+});
+</script>
+{% endblock %}

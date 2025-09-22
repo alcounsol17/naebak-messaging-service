@@ -2,6 +2,14 @@
 إعدادات pytest لخدمة الرسائل - منصة نائبك.كوم
 """
 
+import os
+import django
+from django.conf import settings
+
+# إعداد Django settings قبل استيراد النماذج
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'messaging_service.test_settings')
+django.setup()
+
 import pytest
 from django.contrib.auth.models import User
 from django.test import Client

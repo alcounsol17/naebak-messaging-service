@@ -1,0 +1,568 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}لوحة تحكم الإدارة - خدمة الرسائل{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Sidebar -->
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-user-shield"></i> لوحة تحكم الإدارة</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    <a href="#overview" class="list-group-item list-group-item-action active" data-tab="overview">
+                        <i class="fas fa-tachometer-alt"></i>
+                        نظرة عامة
+                    </a>
+                    <a href="#reports" class="list-group-item list-group-item-action" data-tab="reports">
+                        <i class="fas fa-flag"></i>
+                        البلاغات
+                        <span class="badge bg-danger float-end">{{ pending_reports }}</span>
+                    </a>
+                    <a href="#conversations" class="list-group-item list-group-item-action" data-tab="conversations">
+                        <i class="fas fa-comments"></i>
+                        إدارة المحادثات
+                    </a>
+                    <a href="#users" class="list-group-item list-group-item-action" data-tab="users">
+                        <i class="fas fa-users"></i>
+                        إدارة المستخدمين
+                    </a>
+                    <a href="#statistics" class="list-group-item list-group-item-action" data-tab="statistics">
+                        <i class="fas fa-chart-line"></i>
+                        إحصائيات متقدمة
+                    </a>
+                    <a href="#system" class="list-group-item list-group-item-action" data-tab="system">
+                        <i class="fas fa-cogs"></i>
+                        إعدادات النظام
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="col-md-9">
+        <!-- Overview Tab -->
+        <div id="overview-tab" class="tab-content active">
+            <div class="row">
+                <!-- Key Metrics -->
+                <div class="col-md-3 mb-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <i class="fas fa-comments fa-2x text-primary mb-2"></i>
+                            <h4 class="text-primary">{{ total_conversations }}</h4>
+                            <p class="mb-0">إجمالي المحادثات</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <i class="fas fa-users fa-2x text-success mb-2"></i>
+                            <h4 class="text-success">{{ active_users }}</h4>
+                            <p class="mb-0">المستخدمون النشطون</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <i class="fas fa-flag fa-2x text-danger mb-2"></i>
+                            <h4 class="text-danger">{{ pending_reports }}</h4>
+                            <p class="mb-0">البلاغات المعلقة</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <i class="fas fa-envelope fa-2x text-info mb-2"></i>
+                            <h4 class="text-info">{{ messages_today }}</h4>
+                            <p class="mb-0">رسائل اليوم</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Activity -->
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-clock"></i> النشاط الأخير</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>الوقت</th>
+                                    <th>النوع</th>
+                                    <th>المستخدم</th>
+                                    <th>التفاصيل</th>
+                                    <th>الحالة</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for activity in recent_activities %}
+                                    <tr>
+                                        <td>{{ activity.timestamp|timesince }} مضت</td>
+                                        <td>
+                                            <span class="badge bg-{{ activity.type_color }}">
+                                                {{ activity.get_type_display }}
+                                            </span>
+                                        </td>
+                                        <td>{{ activity.user.get_full_name }}</td>
+                                        <td>{{ activity.description }}</td>
+                                        <td>
+                                            <span class="badge bg-{{ activity.status_color }}">
+                                                {{ activity.get_status_display }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted">لا يوجد نشاط حديث</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Tab -->
+        <div id="reports-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-flag"></i> إدارة البلاغات</h5>
+                    <div class="btn-group" role="group">
+                        <input type="radio" class="btn-check" name="report-filter" id="all-reports" value="all" checked>
+                        <label class="btn btn-outline-secondary btn-sm" for="all-reports">الكل</label>
+                        
+                        <input type="radio" class="btn-check" name="report-filter" id="pending-reports" value="pending">
+                        <label class="btn btn-outline-warning btn-sm" for="pending-reports">قيد المراجعة</label>
+                        
+                        <input type="radio" class="btn-check" name="report-filter" id="reviewed-reports" value="reviewed">
+                        <label class="btn btn-outline-success btn-sm" for="reviewed-reports">تمت المراجعة</label>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if reports %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>المبلِغ</th>
+                                        <th>الرسالة المبلغ عنها</th>
+                                        <th>السبب</th>
+                                        <th>التاريخ</th>
+                                        <th>الأولوية</th>
+                                        <th>الحالة</th>
+                                        <th>الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for report in reports %}
+                                        <tr class="{% if not report.is_reviewed %}table-warning{% endif %}">
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="me-2">
+                                                        {% if report.reporter.userprofile.avatar %}
+                                                            <img src="{{ report.reporter.userprofile.avatar.url }}" 
+                                                                 class="rounded-circle" width="32" height="32">
+                                                        {% else %}
+                                                            <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center" 
+                                                                 style="width: 32px; height: 32px;">
+                                                                <i class="fas fa-user text-white"></i>
+                                                            </div>
+                                                        {% endif %}
+                                                    </div>
+                                                    <div>
+                                                        <strong>{{ report.reporter.get_full_name }}</strong>
+                                                        <br><small class="text-muted">{{ report.reporter.userprofile.get_user_type_display }}</small>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="text-truncate" style="max-width: 200px;">
+                                                    <strong>من:</strong> {{ report.message.sender.get_full_name }}<br>
+                                                    <em>{{ report.message.content }}</em>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-{{ report.reason_color }}">
+                                                    {{ report.get_reason_display }}
+                                                </span>
+                                            </td>
+                                            <td>{{ report.created_at|date:"Y-m-d H:i" }}</td>
+                                            <td>
+                                                {% if report.priority == 'high' %}
+                                                    <span class="badge bg-danger">عالية</span>
+                                                {% elif report.priority == 'medium' %}
+                                                    <span class="badge bg-warning">متوسطة</span>
+                                                {% else %}
+                                                    <span class="badge bg-info">منخفضة</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if report.is_reviewed %}
+                                                    <span class="badge bg-success">تمت المراجعة</span>
+                                                {% else %}
+                                                    <span class="badge bg-warning">قيد المراجعة</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-primary view-report" 
+                                                            data-report-id="{{ report.id }}">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                    {% if not report.is_reviewed %}
+                                                        <button class="btn btn-outline-success approve-report" 
+                                                                data-report-id="{{ report.id }}">
+                                                            <i class="fas fa-check"></i>
+                                                        </button>
+                                                        <button class="btn btn-outline-danger reject-report" 
+                                                                data-report-id="{{ report.id }}">
+                                                            <i class="fas fa-times"></i>
+                                                        </button>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-flag fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">لا توجد بلاغات</h5>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Users Tab -->
+        <div id="users-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-users"></i> إدارة المستخدمين</h5>
+                    <div>
+                        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                            <i class="fas fa-plus"></i>
+                            إضافة مستخدم
+                        </button>
+                        <div class="btn-group" role="group">
+                            <input type="radio" class="btn-check" name="user-filter" id="all-users" value="all" checked>
+                            <label class="btn btn-outline-secondary btn-sm" for="all-users">الكل</label>
+                            
+                            <input type="radio" class="btn-check" name="user-filter" id="citizens" value="citizen">
+                            <label class="btn btn-outline-info btn-sm" for="citizens">المواطنون</label>
+                            
+                            <input type="radio" class="btn-check" name="user-filter" id="representatives" value="representative">
+                            <label class="btn btn-outline-success btn-sm" for="representatives">النواب</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>المستخدم</th>
+                                    <th>النوع</th>
+                                    <th>المحافظة</th>
+                                    <th>تاريخ التسجيل</th>
+                                    <th>آخر نشاط</th>
+                                    <th>الحالة</th>
+                                    <th>الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user_profile in users %}
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="me-2">
+                                                    {% if user_profile.avatar %}
+                                                        <img src="{{ user_profile.avatar.url }}" 
+                                                             class="rounded-circle" width="32" height="32">
+                                                    {% else %}
+                                                        <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center" 
+                                                             style="width: 32px; height: 32px;">
+                                                            <i class="fas fa-user text-white"></i>
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                                <div>
+                                                    <strong>{{ user_profile.user.get_full_name }}</strong>
+                                                    <br><small class="text-muted">{{ user_profile.user.email }}</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{{ user_profile.type_color }}">
+                                                {{ user_profile.get_user_type_display }}
+                                            </span>
+                                        </td>
+                                        <td>{{ user_profile.governorate|default:"-" }}</td>
+                                        <td>{{ user_profile.user.date_joined|date:"Y-m-d" }}</td>
+                                        <td>{{ user_profile.user.last_login|timesince|default:"لم يسجل دخول" }} مضت</td>
+                                        <td>
+                                            {% if user_profile.user.is_active %}
+                                                <span class="badge bg-success">نشط</span>
+                                            {% else %}
+                                                <span class="badge bg-danger">معطل</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-primary view-user" 
+                                                        data-user-id="{{ user_profile.user.id }}">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                <button class="btn btn-outline-warning edit-user" 
+                                                        data-user-id="{{ user_profile.user.id }}">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                {% if user_profile.user.is_active %}
+                                                    <button class="btn btn-outline-danger deactivate-user" 
+                                                            data-user-id="{{ user_profile.user.id }}">
+                                                        <i class="fas fa-ban"></i>
+                                                    </button>
+                                                {% else %}
+                                                    <button class="btn btn-outline-success activate-user" 
+                                                            data-user-id="{{ user_profile.user.id }}">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Tab -->
+        <div id="statistics-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-line"></i> إحصائيات النظام</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <canvas id="conversationsChart" width="400" height="200"></canvas>
+                        </div>
+                        <div class="col-md-6">
+                            <canvas id="usersChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-12">
+                            <canvas id="messagesChart" width="800" height="300"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Settings Tab -->
+        <div id="system-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-cogs"></i> إعدادات النظام</h5>
+                </div>
+                <div class="card-body">
+                    <form id="system-settings-form">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>إعدادات الرسائل</h6>
+                                <div class="mb-3">
+                                    <label for="max-message-length" class="form-label">الحد الأقصى لطول الرسالة</label>
+                                    <input type="number" class="form-control" id="max-message-length" 
+                                           name="max_message_length" value="500" min="100" max="1000">
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="max-conversations-per-user" class="form-label">الحد الأقصى للمحادثات لكل مستخدم</label>
+                                    <input type="number" class="form-control" id="max-conversations-per-user" 
+                                           name="max_conversations_per_user" value="10" min="1" max="50">
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <h6>إعدادات الإشعارات</h6>
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="enable-email-notifications" 
+                                               name="enable_email_notifications" checked>
+                                        <label class="form-check-label" for="enable-email-notifications">
+                                            تفعيل إشعارات البريد الإلكتروني
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="enable-sms-notifications" 
+                                               name="enable_sms_notifications">
+                                        <label class="form-check-label" for="enable-sms-notifications">
+                                            تفعيل إشعارات الرسائل النصية
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-12">
+                                <h6>إعدادات الأمان</h6>
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="auto-moderate" 
+                                               name="auto_moderate" checked>
+                                        <label class="form-check-label" for="auto-moderate">
+                                            المراجعة التلقائية للرسائل
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="require-approval" 
+                                               name="require_approval">
+                                        <label class="form-check-label" for="require-approval">
+                                            تتطلب موافقة الإدارة للمحادثات الجديدة
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i>
+                            حفظ الإعدادات
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Tab switching
+    document.querySelectorAll('[data-tab]').forEach(function(tab) {
+        tab.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetTab = this.getAttribute('data-tab');
+            
+            document.querySelectorAll('.tab-content').forEach(function(content) {
+                content.classList.remove('active');
+            });
+            
+            document.getElementById(targetTab + '-tab').classList.add('active');
+            
+            document.querySelectorAll('[data-tab]').forEach(function(t) {
+                t.classList.remove('active');
+            });
+            this.classList.add('active');
+        });
+    });
+    
+    // Initialize charts
+    if (document.getElementById('conversationsChart')) {
+        const ctx1 = document.getElementById('conversationsChart').getContext('2d');
+        new Chart(ctx1, {
+            type: 'doughnut',
+            data: {
+                labels: ['نشطة', 'مغلقة', 'معلقة'],
+                datasets: [{
+                    data: [{{ active_conversations }}, {{ closed_conversations }}, {{ pending_conversations }}],
+                    backgroundColor: ['#28a745', '#6c757d', '#ffc107']
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'حالة المحادثات'
+                    }
+                }
+            }
+        });
+    }
+    
+    if (document.getElementById('usersChart')) {
+        const ctx2 = document.getElementById('usersChart').getContext('2d');
+        new Chart(ctx2, {
+            type: 'pie',
+            data: {
+                labels: ['مواطنون', 'نواب', 'إدارة'],
+                datasets: [{
+                    data: [{{ citizens_count }}, {{ representatives_count }}, {{ admins_count }}],
+                    backgroundColor: ['#007bff', '#28a745', '#dc3545']
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'توزيع المستخدمين'
+                    }
+                }
+            }
+        });
+    }
+    
+    if (document.getElementById('messagesChart')) {
+        const ctx3 = document.getElementById('messagesChart').getContext('2d');
+        new Chart(ctx3, {
+            type: 'line',
+            data: {
+                labels: {{ messages_chart_labels|safe }},
+                datasets: [{
+                    label: 'الرسائل اليومية',
+                    data: {{ messages_chart_data|safe }},
+                    borderColor: '#007bff',
+                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'إحصائيات الرسائل (آخر 30 يوم)'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

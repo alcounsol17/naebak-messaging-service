@@ -413,19 +413,21 @@ class TestSerializerValidation:
         """اختبار التحقق من موضوع المحادثة"""
         # موضوع صحيح
         data = {
-            'citizen': citizen_user.id,
-            'representative': representative_user.id,
-            'subject': 'موضوع صحيح'
+            'representative_id': representative_user.id,
+            'subject': 'موضوع صحيح',
+            'first_message': 'رسالة أولى'
         }
         serializer = ConversationCreateSerializer(data=data)
         assert serializer.is_valid()
         
         # موضوع فارغ
         data['subject'] = ''
+        data['first_message'] = 'رسالة أولى'
         serializer = ConversationCreateSerializer(data=data)
         assert not serializer.is_valid()
         
         # موضوع طويل جداً
         data['subject'] = 'موضوع طويل جداً ' * 50
+        data['first_message'] = 'رسالة أولى'
         serializer = ConversationCreateSerializer(data=data)
         assert not serializer.is_valid()

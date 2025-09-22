@@ -237,3 +237,15 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     X_FRAME_OPTIONS = 'DENY'
+
+
+# Service Integration Settings
+CONTENT_SERVICE_URL = os.getenv('CONTENT_SERVICE_URL', 'http://localhost:8001')
+AUTH_SERVICE_URL = os.getenv('AUTH_SERVICE_URL', 'http://localhost:8002')
+SERVICE_TIMEOUT = int(os.getenv('SERVICE_TIMEOUT', '10'))
+CACHE_TIMEOUT = int(os.getenv('CACHE_TIMEOUT', '300'))
+
+# Message Settings (from prompt requirements)
+MAX_MESSAGE_LENGTH = 500  # As specified in prompt
+ALLOW_ATTACHMENTS = False  # Explicitly disabled in prompt
+MAX_CONVERSATIONS_PER_USER = 10

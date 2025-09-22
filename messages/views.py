@@ -499,3 +499,232 @@ class UserStatsViewSet(viewsets.ViewSet):
         
         serializer = UserStatsSerializer(stats_data)
         return Response(serializer.data)
+
+
+# Template Views for User Interfaces
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+from .integrations import integration_manager
+
+
+@login_required
+def citizen_dashboard(request):
+    """صفحة إدارة الرسائل للمواطن"""
+    try:
+        user_profile = request.user.userprofile
+        if user_profile.user_type != 'citizen':
+            return render(request, 'messages/error.html', {
+                'error': 'هذه الصفحة مخصصة للمواطنين فقط'
+            })
+    except UserProfile.DoesNotExist:
+        UserProfile.objects.create(user=request.user, user_type='citizen')
+        user_profile = request.user.userprofile
+    
+    # Get user's conversations
+    conversations = Conversation.objects.filter(
+        citizen=request.user
+    ).select_related('representative').order_by('-updated_at')
+    
+    # Get messaging context from content service
+    context = integration_manager.get_messaging_context(request.user.id)
+    
+    # Add user-specific data
+    context.update({
+        'user': request.user,
+        'user_profile': user_profile,
+        'conversations': conversations,
+        'unread_count': conversations.filter(
+            messages__is_read=False,
+            messages__sender__ne=request.user
+        ).distinct().count(),
+        'total_conversations': conversations.count(),
+        'active_conversations': conversations.filter(status='active').count(),
+    })
+    
+    return render(request, 'messages/citizen_dashboard.html', context)
+
+
+@login_required
+def representative_dashboard(request):
+    """صفحة إدارة الرسائل للنائب"""
+    try:
+        user_profile = request.user.userprofile
+        if user_profile.user_type != 'representative':
+            return render(request, 'messages/error.html', {
+                'error': 'هذه الصفحة مخصصة للنواب فقط'
+            })
+    except UserProfile.DoesNotExist:
+        return render(request, 'messages/error.html', {
+            'error': 'يجب إنشاء ملف شخصي أولاً'
+        })
+    
+    # Get representative's conversations
+    conversations = Conversation.objects.filter(
+        representative=request.user
+    ).select_related('citizen').order_by('-updated_at')
+    
+    # Get representative info from content service
+    representative_info = integration_manager.content_service.get_representative_contact_info(
+        user_profile.representative_id
+    ) if hasattr(user_profile, 'representative_id') else None
+    
+    context = {
+        'user': request.user,
+        'user_profile': user_profile,
+        'representative_info': representative_info,
+        'conversations': conversations,
+        'unread_count': conversations.filter(
+            messages__is_read=False,
+            messages__sender__ne=request.user
+        ).distinct().count(),
+        'total_conversations': conversations.count(),
+        'active_conversations': conversations.filter(status='active').count(),
+        'pending_conversations': conversations.filter(status='pending').count(),
+        'reports_count': MessageReport.objects.filter(
+            message__conversation__representative=request.user,
+            is_reviewed=False
+        ).count(),
+    }
+    
+    return render(request, 'messages/representative_dashboard.html', context)
+
+
+@login_required
+def admin_dashboard(request):
+    """صفحة إدارة الرسائل للأدمن"""
+    if not request.user.is_staff:
+        return render(request, 'messages/error.html', {
+            'error': 'هذه الصفحة مخصصة للإدارة فقط'
+        })
+    
+    # Get system statistics
+    total_conversations = Conversation.objects.count()
+    active_users = User.objects.filter(last_login__gte=timezone.now() - timedelta(days=30)).count()
+    pending_reports = MessageReport.objects.filter(is_reviewed=False).count()
+    messages_today = Message.objects.filter(created_at__date=timezone.now().date()).count()
+    
+    # Get recent activity
+    recent_activities = []  # This would be populated from an activity log
+    
+    # Get reports for admin review
+    reports = MessageReport.objects.filter(
+        is_reviewed=False
+    ).select_related('reporter', 'message__sender', 'message__conversation').order_by('-created_at')[:20]
+    
+    # Get users for management
+    users = UserProfile.objects.select_related('user').order_by('-user__date_joined')[:50]
+    
+    context = {
+        'user': request.user,
+        'total_conversations': total_conversations,
+        'active_users': active_users,
+        'pending_reports': pending_reports,
+        'messages_today': messages_today,
+        'recent_activities': recent_activities,
+        'reports': reports,
+        'users': users,
+        # Chart data
+        'active_conversations': Conversation.objects.filter(status='active').count(),
+        'closed_conversations': Conversation.objects.filter(status='closed').count(),
+        'pending_conversations': Conversation.objects.filter(status='pending').count(),
+        'citizens_count': UserProfile.objects.filter(user_type='citizen').count(),
+        'representatives_count': UserProfile.objects.filter(user_type='representative').count(),
+        'admins_count': User.objects.filter(is_staff=True).count(),
+        'messages_chart_labels': [],  # Would be populated with actual data
+        'messages_chart_data': [],    # Would be populated with actual data
+    }
+    
+    return render(request, 'messages/admin_dashboard.html', context)
+
+
+@require_http_methods(["GET"])
+@login_required
+def get_representatives_list(request):
+    """API endpoint to get representatives list for messaging"""
+    governorate = request.GET.get('governorate')
+    search = request.GET.get('search')
+    
+    filters = {}
+    if governorate:
+        filters['governorate'] = governorate
+    if search:
+        filters['search'] = search
+    
+    representatives = integration_manager.content_service.search_representatives(filters)
+    
+    return JsonResponse({
+        'representatives': representatives,
+        'count': len(representatives)
+    })
+
+
+@require_http_methods(["POST"])
+@login_required
+def start_conversation_with_representative(request):
+    """Start a new conversation with a representative"""
+    import json
+    
+    try:
+        data = json.loads(request.body)
+        representative_id = data.get('representative_id')
+        subject = data.get('subject', '').strip()
+        initial_message = data.get('message', '').strip()
+        
+        if not representative_id or not subject or not initial_message:
+            return JsonResponse({
+                'error': 'جميع الحقول مطلوبة'
+            }, status=400)
+        
+        # Validate representative exists
+        if not integration_manager.content_service.validate_representative_exists(representative_id):
+            return JsonResponse({
+                'error': 'النائب المحدد غير موجود'
+            }, status=404)
+        
+        # Check if conversation already exists
+        existing_conversation = Conversation.objects.filter(
+            citizen=request.user,
+            representative_id=representative_id,
+            status__in=['active', 'pending']
+        ).first()
+        
+        if existing_conversation:
+            return JsonResponse({
+                'error': 'يوجد محادثة نشطة مع هذا النائب بالفعل',
+                'conversation_id': existing_conversation.id
+            }, status=400)
+        
+        # Create new conversation
+        conversation = Conversation.objects.create(
+            citizen=request.user,
+            representative_id=representative_id,
+            subject=subject,
+            status='pending'
+        )
+        
+        # Create initial message
+        Message.objects.create(
+            conversation=conversation,
+            sender=request.user,
+            content=initial_message
+        )
+        
+        # Increment message count in content service
+        integration_manager.content_service.increment_message_count(representative_id)
+        
+        return JsonResponse({
+            'success': True,
+            'conversation_id': conversation.id,
+            'message': 'تم إنشاء المحادثة بنجاح'
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'error': 'بيانات غير صحيحة'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'error': 'حدث خطأ غير متوقع'
+        }, status=500)

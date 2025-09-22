@@ -5,7 +5,8 @@
 import uuid
 from django.db import models
 from django.contrib.auth.models import User
-from django.core.validators import MaxLengthValidator
+from django.core.validators import MaxLengthValidator, RegexValidator
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 
@@ -31,7 +32,15 @@ class UserProfile(BaseModel):
     
     user = models.OneToOneField(User, on_delete=models.CASCADE, verbose_name="المستخدم")
     user_type = models.CharField(max_length=20, choices=USER_TYPES, verbose_name="نوع المستخدم")
-    phone = models.CharField(max_length=15, blank=True, verbose_name="رقم الهاتف")
+    phone = models.CharField(
+        max_length=15, 
+        blank=True, 
+        verbose_name="رقم الهاتف",
+        validators=[RegexValidator(
+            regex=r'^\d{10,15}$',
+            message='رقم الهاتف يجب أن يكون بين 10 و 15 رقم'
+        )]
+    )
     avatar = models.ImageField(upload_to='avatars/', blank=True, null=True, verbose_name="الصورة الشخصية")
     
     # معلومات إضافية للنواب
@@ -52,7 +61,7 @@ class UserProfile(BaseModel):
         ]
 
     def __str__(self):
-        return f"{self.user.get_full_name() or self.user.username} ({self.get_user_type_display()})"
+        return f"{self.user.get_full_name() or self.user.username} - {self.get_user_type_display()}"
 
     @property
     def full_name(self):
@@ -122,13 +131,29 @@ class Conversation(BaseModel):
         ordering = ['-last_message_at', '-created_at']
 
     def __str__(self):
-        return f"{self.subject} - {self.citizen.get_full_name()} → {self.representative.get_full_name()}"
+        if len(self.subject) > 30:
+            return f"{self.subject[:30]}..."
+        return self.subject
 
     def save(self, *args, **kwargs):
         # تحديث آخر رسالة عند إنشاء المحادثة
         if not self.last_message_at:
             self.last_message_at = timezone.now()
         super().save(*args, **kwargs)
+    
+    def close(self, closed_by_user):
+        """إغلاق المحادثة"""
+        self.is_closed = True
+        self.closed_at = timezone.now()
+        self.closed_by = closed_by_user
+        self.save()
+    
+    def update_last_message(self, message):
+        """تحديث آخر رسالة"""
+        self.last_message_at = message.created_at
+        self.last_message_by = message.sender
+        self.total_messages = self.messages.count()
+        self.save()
 
     @property
     def unread_count_for_citizen(self):
@@ -195,8 +220,11 @@ class Message(BaseModel):
         ordering = ['created_at']
 
     def __str__(self):
-        content_preview = self.content[:50] + "..." if len(self.content) > 50 else self.content
-        return f"{self.sender.get_full_name()}: {content_preview}"
+        if self.is_system_message:
+            return "رسالة نظام"
+        content_preview = self.content[:30] + "..." if len(self.content) > 30 else self.content
+        sender_name = self.sender.get_full_name() or self.sender.username
+        return f"رسالة من {sender_name}: {content_preview}"
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
@@ -284,7 +312,16 @@ class MessageReport(BaseModel):
         ]
 
     def __str__(self):
-        return f"إبلاغ من {self.reporter.get_full_name()} - {self.get_reason_display()}"
+        reporter_name = self.reporter.get_full_name() or self.reporter.username
+        return f"إبلاغ عن رسالة - {reporter_name} - {self.get_reason_display()}"
+    
+    def mark_as_reviewed(self, reviewed_by_user, action_taken=""):
+        """تمييز الإبلاغ كمراجع"""
+        self.is_reviewed = True
+        self.reviewed_at = timezone.now()
+        self.reviewed_by = reviewed_by_user
+        self.action_taken = action_taken
+        self.save()
 
 
 class MessageStatistics(BaseModel):
@@ -355,7 +392,7 @@ class SystemNotification(BaseModel):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.title} - {self.user.get_full_name()}"
+        return self.title
 
     def mark_as_read(self):
         """تحديد الإشعار كمقروء"""

@@ -116,7 +116,9 @@ class MessageCreateSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         """إنشاء رسالة جديدة"""
-        validated_data['sender'] = self.context['request'].user
+        request = self.context.get('request')
+        if request and request.user:
+            validated_data['sender'] = request.user
         return super().create(validated_data)
 
 
@@ -182,7 +184,11 @@ class ConversationSerializer(serializers.ModelSerializer):
     
     def get_unread_count(self, obj):
         """الحصول على عدد الرسائل غير المقروءة للمستخدم الحالي"""
-        user = self.context['request'].user
+        request = self.context.get('request')
+        if not request or not request.user:
+            return 0
+        
+        user = request.user
         if user == obj.citizen:
             return obj.unread_count_for_citizen
         elif user == obj.representative:
@@ -228,7 +234,8 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
         first_message_content = validated_data.pop('first_message')
         
         representative = User.objects.get(id=representative_id)
-        citizen = self.context['request'].user
+        request = self.context.get('request')
+        citizen = request.user if request else None
         
         # إنشاء المحادثة
         conversation = Conversation.objects.create(
@@ -263,7 +270,9 @@ class MessageReportSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         """إنشاء إبلاغ جديد"""
-        validated_data['reporter'] = self.context['request'].user
+        request = self.context.get('request')
+        if request and request.user:
+            validated_data['reporter'] = request.user
         return super().create(validated_data)
 
 
