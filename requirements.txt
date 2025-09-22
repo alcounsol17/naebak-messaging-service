@@ -1,0 +1,39 @@
+# متطلبات خدمة الرسائل - منصة نائبك.كوم
+
+# Django Framework
+Django==4.2.7
+djangorestframework==3.14.0
+
+# Database
+psycopg2-binary==2.9.7
+dj-database-url==2.1.0
+
+# Authentication & Security
+djangorestframework-simplejwt==5.3.0
+django-cors-headers==4.3.1
+
+# Filtering & Pagination
+django-filter==23.3
+
+# Environment Variables
+python-decouple==3.8
+
+# File Handling
+Pillow==10.0.1
+
+# Caching & Performance
+redis==5.0.1
+django-redis==5.4.0
+
+# Background Tasks
+celery==5.3.4
+
+# Static Files
+whitenoise==6.6.0
+
+# Utilities
+python-slugify==8.0.1
+uuid==1.30
+
+# Production Server
+gunicorn==21.2.0
